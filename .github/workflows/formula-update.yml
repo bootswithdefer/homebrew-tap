@@ -52,7 +52,7 @@ jobs:
 
       - name: Checkout tap
         if: steps.payload.outputs.supported == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Update dcg cask
         if: steps.payload.outputs.supported == 'true' && steps.payload.outputs.tool == 'dcg'
