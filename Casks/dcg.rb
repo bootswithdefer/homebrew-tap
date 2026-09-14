@@ -35,7 +35,7 @@ cask "dcg" do
 
   postflight_steps do
     on_macos do
-      run "xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dcg"]
+      run "xattr", args: ["-dr", "com.apple.quarantine", "{{staged_path}}/dcg"]
     end
   end
 

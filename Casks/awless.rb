@@ -36,7 +36,7 @@ cask "awless" do
 
   postflight_steps do
     on_macos do
-      run "xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/awless"]
+      run "xattr", args: ["-dr", "com.apple.quarantine", "{{staged_path}}/awless"]
     end
   end
 
