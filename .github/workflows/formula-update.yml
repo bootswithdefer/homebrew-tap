@@ -1,0 +1,136 @@
+name: formula-update
+
+# Listens for the `formula-update` repository_dispatch that source projects
+# send from their release pipelines (e.g. destructive_command_guard's dist.yml
+# `notify-homebrew-tap` job). For a supported `tool`, it regenerates that
+# tool's cask by pinning the released `version` and refreshing the per-target
+# SHA256 checksums from the release's `.sha256` sidecars, then commits.
+#
+# Payload contract (peter-evans/repository-dispatch client-payload):
+#   { "tool": "<name>", "version": "<X.Y.Z>" }   # version has NO leading 'v'
+
+on:
+  repository_dispatch:
+    types: [formula-update]
+
+permissions:
+  contents: write
+
+concurrency:
+  # Serialize updates so two releases landing together cannot race the commit.
+  group: formula-update
+  cancel-in-progress: false
+
+jobs:
+  update-cask:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate payload
+        id: payload
+        env:
+          TOOL: ${{ github.event.client_payload.tool }}
+          VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+          # `tool` must be a known cask this workflow maintains, and `version`
+          # must be a bare semantic version (defends against an injected ref).
+          case "$TOOL" in
+            dcg) ;;
+            *)
+              echo "::notice::Ignoring formula-update for unsupported tool '${TOOL:-<empty>}'"
+              echo "supported=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "::error::version '${VERSION:-<empty>}' is not a bare semantic version"
+            exit 1
+          fi
+          echo "supported=true" >> "$GITHUB_OUTPUT"
+          echo "tool=$TOOL" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap
+        if: steps.payload.outputs.supported == 'true'
+        uses: actions/checkout@v4
+
+      - name: Update dcg cask
+        if: steps.payload.outputs.supported == 'true' && steps.payload.outputs.tool == 'dcg'
+        env:
+          VERSION: ${{ steps.payload.outputs.version }}
+        run: |
+          set -euo pipefail
+          repo="bootswithdefer/destructive_command_guard"
+          tag="v${VERSION}"
+          base="https://github.com/${repo}/releases/download/${tag}"
+
+          # Map each cask target triple to its released archive.
+          declare -A targets=(
+            [x86_64-apple-darwin]="dcg-x86_64-apple-darwin.tar.xz"
+            [aarch64-apple-darwin]="dcg-aarch64-apple-darwin.tar.xz"
+            [x86_64-unknown-linux-musl]="dcg-x86_64-unknown-linux-musl.tar.xz"
+            [aarch64-unknown-linux-gnu]="dcg-aarch64-unknown-linux-gnu.tar.xz"
+          )
+
+          # Fetch each SHA256 from the release sidecar (authoritative — do not
+          # re-hash locally). A missing/short sidecar fails the run rather than
+          # writing a bad cask.
+          declare -A sums
+          for triple in "${!targets[@]}"; do
+            archive="${targets[$triple]}"
+            sum="$(curl -fsSL "${base}/${archive}.sha256" | awk '{print $1}')"
+            if [[ ! "$sum" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "::error::bad or missing checksum for ${archive} (got '${sum:-<empty>}')"
+              exit 1
+            fi
+            sums[$triple]="$sum"
+          done
+
+          # Rewrite version + each per-target sha256 in place. Each sha256 line
+          # is keyed by the `url` line that follows it (which names the target
+          # triple), so unrelated 64-hex strings cannot be mistargeted.
+          cask="Casks/dcg.rb"
+          tmp="$(mktemp)"
+          awk -v ver="$VERSION" \
+              -v s_xd="${sums[x86_64-apple-darwin]}" \
+              -v s_ad="${sums[aarch64-apple-darwin]}" \
+              -v s_xl="${sums[x86_64-unknown-linux-musl]}" \
+              -v s_al="${sums[aarch64-unknown-linux-gnu]}" '
+            # Buffer a pending sha256 line until we see the url that identifies it.
+            /^[[:space:]]*version / { sub(/"[^"]*"/, "\"" ver "\""); print; next }
+            /^[[:space:]]*sha256 / { pending=$0; next }
+            /^[[:space:]]*url / {
+              if (pending != "") {
+                line=pending
+                if ($0 ~ /dcg-x86_64-apple-darwin\.tar\.xz/)        sub(/"[0-9a-f]{64}"/, "\"" s_xd "\"", line)
+                else if ($0 ~ /dcg-aarch64-apple-darwin\.tar\.xz/)  sub(/"[0-9a-f]{64}"/, "\"" s_ad "\"", line)
+                else if ($0 ~ /dcg-x86_64-unknown-linux-musl\.tar\.xz/) sub(/"[0-9a-f]{64}"/, "\"" s_xl "\"", line)
+                else if ($0 ~ /dcg-aarch64-unknown-linux-gnu\.tar\.xz/) sub(/"[0-9a-f]{64}"/, "\"" s_al "\"", line)
+                print line
+                pending=""
+              }
+              print
+              next
+            }
+            { if (pending != "") { print pending; pending="" } print }
+          ' "$cask" > "$tmp"
+          mv "$tmp" "$cask"
+
+          echo "=== updated cask ==="
+          cat "$cask"
+
+      - name: Commit and push if changed
+        if: steps.payload.outputs.supported == 'true' && steps.payload.outputs.tool == 'dcg'
+        env:
+          VERSION: ${{ steps.payload.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Casks/dcg.rb; then
+            echo "::notice::Casks/dcg.rb already at v${VERSION}; nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/dcg.rb
+          git commit -m "feat(dcg): update cask to destructive_command_guard v${VERSION}"
+          git push
