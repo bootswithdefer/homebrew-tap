@@ -1,24 +1,24 @@
 cask "dcg" do
-  version "0.16.0"
+  version "0.16.1"
 
   on_macos do
     on_intel do
-      sha256 "6302e35c5a5d9718cec1009f46cd962d579f572c9372de4eb176ad855706f095"
+      sha256 "5fd58f6febdb611235e19a4669179b42e3f2fb2a701b56e35e3390aa383c460c"
       url "https://github.com/bootswithdefer/destructive_command_guard/releases/download/v#{version}/dcg-x86_64-apple-darwin.tar.xz"
     end
     on_arm do
-      sha256 "afe5e09ca1c1a73640c91f0d1ce114bd30982d71b70120191b2fae77345f6075"
+      sha256 "f0952e944e114ebbc56e4d73a8136d74c9c9a7def959712d944e4048300f3344"
       url "https://github.com/bootswithdefer/destructive_command_guard/releases/download/v#{version}/dcg-aarch64-apple-darwin.tar.xz"
     end
   end
 
   on_linux do
     on_intel do
-      sha256 "3222b1b8834c9a6ab74c9e6b39ed9045ec42158920e3b47671ea08daff1ba5e9"
+      sha256 "5043da109bd8d8f9dcef81fd37c98bb03976e5725b46a6220c2dcede583d841e"
       url "https://github.com/bootswithdefer/destructive_command_guard/releases/download/v#{version}/dcg-x86_64-unknown-linux-musl.tar.xz"
     end
     on_arm do
-      sha256 "cb36743b6d1664496fe78bc0b7301e4c7069a83e1984ea624c845004b0138a16"
+      sha256 "9bb14f741b2c0b6633e8ca2ead7b7bb13b61200b12ca7ddc542107d3d509c11e"
       url "https://github.com/bootswithdefer/destructive_command_guard/releases/download/v#{version}/dcg-aarch64-unknown-linux-gnu.tar.xz"
     end
   end
