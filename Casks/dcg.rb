@@ -33,9 +33,9 @@ cask "dcg" do
 
   binary "dcg"
 
-  postflight do
-    if OS.mac?
-      system "xattr", "-dr", "com.apple.quarantine", "#{staged_path}/dcg"
+  postflight_steps do
+    on_macos do
+      run "xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dcg"]
     end
   end
 
