@@ -37,6 +37,25 @@ brew upgrade --cask dcg
 
 Source: [bootswithdefer/destructive_command_guard](https://github.com/bootswithdefer/destructive_command_guard)
 
+### git-secateurs
+
+Automatically trims tracking branches whose upstream branches are merged or stray.
+A modernized hard fork of [foriequal0/git-trim](https://github.com/foriequal0/git-trim).
+
+```sh
+brew install --cask bootswithdefer/tap/git-secateurs
+```
+
+Upgrade with:
+
+```sh
+brew upgrade --cask git-secateurs
+```
+
+Installs the `git-secat` binary, usable as `git secat`.
+
+Source: [bootswithdefer/git-secateurs](https://github.com/bootswithdefer/git-secateurs)
+
 ## Why casks rather than formulae
 
 These ship pre-built binaries. Homebrew reserves formulae for software compiled from
